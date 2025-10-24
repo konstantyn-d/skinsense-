@@ -1,0 +1,102 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  profile      UserProfile?
+  scans        SkinScan[]
+  routines     CareRoutine[]
+}
+
+model UserProfile {
+  id                 Int     @id @default(autoincrement())
+  userId             Int     @unique
+  skinType           SkinType?
+  skinHealthProblems String? // JSON-строка (массив тегов), если нужно
+  otherHealthProblems String?
+  recommendationsNote String? // персональные текстовые заметки
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+enum SkinType {
+  DRY
+  OILY
+  COMBINATION
+  NORMAL
+  SENSITIVE
+}
+
+model SkinScan {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  createdAt       DateTime  @default(now())
+  imagePath       String    // относительный путь к файлу (для удаления)
+  // Результаты API (сырые и нормализованные)
+  rawResultJson   String?   // JSON-строка с полным ответом внешнего API
+  scoreAcne       Float?
+  scoreWrinkles   Float?
+  scoreRedness    Float?
+  scoreDarkSpots  Float?
+  scorePores      Float?
+  summary         String?   // короткий вывод
+
+  user User @relation(fields: [userId], references: [id])
+  recommendations ScanRecommendation[]
+}
+
+model RecommendationItem {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  category    String?  // product / routine / lifestyle / note
+  linkUrl     String?
+  createdAt   DateTime @default(now())
+
+  scanRecommendations ScanRecommendation[]
+  routineItems        RoutineItem[]
+}
+
+model ScanRecommendation {
+  id                  Int       @id @default(autoincrement())
+  scanId              Int
+  recommendationId    Int
+
+  scan           SkinScan          @relation(fields: [scanId], references: [id])
+  recommendation RecommendationItem @relation(fields: [recommendationId], references: [id])
+
+  @@unique([scanId, recommendationId])
+}
+
+model CareRoutine {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  name      String
+  createdAt DateTime @default(now())
+
+  user   User         @relation(fields: [userId], references: [id])
+  items  RoutineItem[]
+}
+
+model RoutineItem {
+  id                 Int      @id @default(autoincrement())
+  routineId          Int
+  recommendationId   Int      // привязка к RecommendationItem (например, крем)
+  stepOrder          Int
+  notes              String?
+
+  routine          CareRoutine       @relation(fields: [routineId], references: [id])
+  recommendation   RecommendationItem @relation(fields: [recommendationId], references: [id])
+}
